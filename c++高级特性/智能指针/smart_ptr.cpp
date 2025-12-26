@@ -7,6 +7,8 @@ int main()
     // auto_ptrTest1();
     // unique_ptrTest1();
     // shared_ptrTest1();
-    fun();
+    // fun();
+
     // weak_ptrTest1();
+    Thistest();
 }

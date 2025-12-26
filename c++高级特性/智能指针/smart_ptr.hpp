@@ -1,6 +1,8 @@
 #pragma once
 #include <iostream>
 #include <memory>
+#include <functional>
+#include <thread>
 /*
     1.为什么引入智能指针
     C++内存管理中 使用new分配内存，必须在合适的时机释放，忘记释放会造成内存泄漏，释放后没有置为nullptr变成野指针,多个指针指向同一内存，多次释放程序崩溃
@@ -83,6 +85,7 @@ void shared_ptrTest1()
         再析构pa --引用计数 此时为1不能释放资源 清空资源指针和控制块指针
         导致对象的析构永远不会调用
     weak_ptr解决 将A中的std::shared_ptr<B> pb_;改为std::weak_ptr<B> pb_
+    如果需要使用shared_ptr交叉引用，需要把一个方向的引用改成weak_ptr 打破循环引用
     使用weak_ptr时，需要通过lock函数将其提升为shared_ptr，才能访问对象 。如果对象已经被释放，lock函数会返回一个空的shared_ptr 。
 */
 class B;
@@ -131,4 +134,84 @@ void weak_ptrTest1()
     } else {
         std::cout << "object has been deleted" << std::endl;
     }
+}
+/*
+    make_shared 和shared_ptr的区别 make_shared将对象构造和控制块分配合并为一个原子操作
+     1) 内存分配上
+        make_shared 一次内存分配 同时创建对象和 控制块
+        shared_ptr 需要两次 内存分配 分别创建对象和控制块 ->内存碎片化
+     2）安全性上 
+        make_shared 将对象的构造和智能指针的构造 合并成一个操作 减少显示使用new  
+        避免了 对象构造之后，shared_ptr构造之前发生异常，构造对象分配的内存无法正确释放 
+    3）内存释放上
+        shared_ptr引用计数为0 但只要有weak_ptr指向 对象和控制块无法被销毁
+        make_shared 引用计数为0  但只要有weak_ptr指向 对象可以被销毁
+    
+*/
+
+/*
+    make_shared/shared_ptr  
+    用同一裸指针多次构造多个 shared_ptr（导致多控制块、引用计数独立）
+    创建不同的控制块 引用计数不会正常增加 重复析构风险
+    很多接口（尤其是异步操作、回调注册接口）会要求传入shared_ptr（而非裸指针），
+    目的是通过引用计数管理类对象生命周期，避免对象在函数执行期间被销毁。此时类成员函数内部需要将this转为shared_ptr传入该接口。
+    如果直接传递this指针 ，引用计数不能正确增加 ，
+    如果类对象提前销毁 对象先于异步线程析构  异步线程访问类对象就会访问到悬空指针
+    而且在析构的时候 还会导致重复释放 第二次析构访问控制块的时候会访问到悬空指针 因为引用计数和资源没有正确关联起来  
+
+*/
+
+class TaskHandler : public std::enable_shared_from_this<TaskHandler> {
+public:
+    void start_task() {
+        // 异步任务接口要求传入shared_ptr<TaskHandler>
+        async_task([self = badGetSelf()]() {
+            self->do_task(); // 确保任务执行期间，当前对象不会被销毁
+            std::cout << "异步任务执行完成，对象引用计数：" << self.use_count() << std::endl;
+        });
+    }
+
+    std::shared_ptr<TaskHandler> getSelfSharedPtr() {
+        //通过shared_from_this()获取this对应的shared_ptr
+        return shared_from_this();
+    }
+
+    std::shared_ptr<TaskHandler> badGetSelf() {
+        // 错误：直接用this创建shared_ptr
+        return std::shared_ptr<TaskHandler>(this); 
+    }
+    void do_task() {
+        std::cout << "执行核心任务..." << std::endl;
+    }
+
+private:
+    // 模拟要求shared_ptr参数的异步任务接口
+    void async_task(std::function<void()> task) {
+        std::thread t(std::move(task));
+        t.detach();
+    }
+};
+
+
+
+void Thistest()
+{
+   // auto ptr1 = std::make_shared<int[]>(1,2,3,4,5,6,7,8,9,10);
+   
+    int* A = new int[10]{1,2,3,4,5,6,7,8,9,10};
+    std::shared_ptr<int[]> ptr2(A);
+    std::cout << ptr2.use_count() << std::endl;
+    int* B = A;
+   // std::shared_ptr<int[]> ptr3(B); 用同一裸指针多次构造多个 shared_ptr（导致多控制块、引用计数独立）
+    std::cout << ptr2.use_count() << std::endl;
+    // std::cout << ptr3.use_count() << std::endl;
+
+
+    auto handler = std::make_shared<TaskHandler>();
+    handler->start_task();
+    handler.reset();
+    std::cout << "主线程引用计数：" << handler.use_count() << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // 等待异步任务完成
+
+
 }
