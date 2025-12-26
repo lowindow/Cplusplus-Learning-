@@ -38,7 +38,7 @@ void func(char *ptr)
     2.调度器锁模式
     i. 查看、设置调度期锁
     show scheduler-locking
-    set sheduler-locking [off/on/step] 不锁/ 只有当前线程可以运行 其他线程锁定/ 单步执行某一线程 保证当前线程 不改变 其他线程单步执行 该模式下执行continue until finish命令其它线程也执行 遇到断点 切换断点线程为当前线程
+    set sheduler-locking [off/on/step] 不锁/ 只有当前线程可以运行 其他线程锁定/ 单步执行某一线程 保证当前线程不被切换 其他线程单步执行 该模式下执行continue until finish命令其它线程也执行 遇到断点 切换断点线程为当前线程
     ii.测试调度器锁为step模式
 */
 
@@ -64,7 +64,7 @@ void* thread_entry_funcB(void* agrs){
 }
 
 void func1()
-{
+{                      
     pthread_t a,b;
     pthread_create(&a,nullptr,thread_entry_funcA,nullptr);
     pthread_create(&b,nullptr,thread_entry_funcB,nullptr);
