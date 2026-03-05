@@ -38,7 +38,13 @@ public:
         return true;
     }
 
-
+SpscRingQue
+SpscRingQue
+SpscRingQue
+SpscRingQue
+SpscRingQue
+SpscRingQue
+SpscRingQue
     // 消费者线程调用
     bool pop(T& out) {
         size_t r = read_.load(std::memory_order_relaxed);
@@ -162,3 +168,96 @@ int main() {
     test_spsc_correctness();
     return 0;
 }
+
+
+
+
+
+
+#include <atomic>
+#include <array> 
+/*
+    为什么选择std::array作为缓冲区数据结构？
+     固定容量 保持队列有界、连续内存、没有扩容带来的风险、RAII生命周期管理
+     vector + capacity 可以保证有界，但是vector没有从类型层面禁止扩容、
+     裸指针开辟内存空间的话，带来手动管理内存的复杂性和安全性
+*/
+template <class T,size_t N>
+class SpscRing{
+    static_assert((N & (N-1)) == 0,"N must be power of two");
+public:
+
+    /*ring buffer 本身用 “full->return false” 的无锁实现，保证逻辑简单可靠；队满时的策略不写死在队列里，而是在业务层决定：比如 EEG/眼动这种实时流可选择“丢旧保新”（先 pop 再 push）*/
+    bool push(T&& val) {
+        const size_t t = tail_.load(std::memory_order_relaxed);
+        const size_t next = (t+1) & mask_;
+        if(next == head_.load(std::memory_order_acquire)) return false;
+        buf_[t] = std::move(v);
+        tail.store(next,std::memory_order_release);
+        return true;
+    }
+
+    bool pop(T& out) {
+        const size_t h = head_.load(std::memory_order_relaxed);
+        if (h == tail_.load(std::memory_order_acquire)) return false; // empty
+        out = std::move(buf_[h]);
+        head_.store((h + 1) & mask_, std::memory_order_release);
+        return true;
+    }
+
+    bool empty() const noexcept {
+        return head_.load(std::memory_order_acquire) ==
+               tail_.load(std::memory_order_acquire);
+    }
+
+private:
+    static constexpr size_t mask_ = N - 1;
+    alignas(64) std::array<T,N> buf_;
+    alignas(64) std::atomic<size_t> head_{0};
+    alignas(64) std::atomic<size_t> tail_{0};
+};
+
+
+
+
+// SpscRing.hpp
+#pragma once
+#include <atomic>
+#include <array>
+#include <cstddef>
+#include <utility>
+
+// N 必须是 2 的幂
+template <class T, size_t N>
+class SpscRing {
+    static_assert((N & (N - 1)) == 0, "N must be power of two");
+
+public:
+    bool try_push(T&& v) noexcept {
+        const size_t t = tail_.load(std::memory_order_relaxed);
+        const size_t next = (t + 1) & mask_;
+        if (next == head_.load(std::memory_order_acquire)) return false; // full
+        buf_[t] = std::move(v);
+        tail_.store(next, std::memory_order_release);
+        return true;
+    }
+
+    bool try_pop(T& out) noexcept {
+        const size_t h = head_.load(std::memory_order_relaxed);
+        if (h == tail_.load(std::memory_order_acquire)) return false; // empty
+        out = std::move(buf_[h]);
+        head_.store((h + 1) & mask_, std::memory_order_release);
+        return true;
+    }
+
+    bool empty() const noexcept {
+        return head_.load(std::memory_order_acquire) ==
+               tail_.load(std::memory_order_acquire);
+    }
+
+private:
+    static constexpr size_t mask_ = N - 1;
+    alignas(64) std::array<T, N> buf_{};
+    alignas(64) std::atomic<size_t> head_{0};
+    alignas(64) std::atomic<size_t> tail_{0};
+};

@@ -2,8 +2,8 @@
 
 int main()
 {
-    //char *ptr = nullptr;
-    //func(ptr);
+    // char *ptr = nullptr;
+    // func(ptr);
     func1();
     return 0;
 }
