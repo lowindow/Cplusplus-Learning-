@@ -513,6 +513,56 @@ top指令看到程序运行中内存占用持续上涨且不回落,长时间运�
 
 生成coredump文件使用gdb调试，查看崩溃点的变量的值
 
+## GDB调试
+
+```c++
+/*
+    什么是coredump文件？                
+        核心转储文件 进程运行时，突然崩溃的一瞬间进程在内存中的快照，会把进程此刻的内存 寄存器状态、运行堆栈等信息转储保存在一个文件里,
+    程序员后续可以通过coredump文件进行查看进程崩溃的原因，进而修复代码bug
+    产生不了coredump怎么办 ？
+          ulimit -a               # 查看core file size
+          ulimit -c unlimited    # 设置core file size  
+          此时是否能产生core文件 需要根据磁盘大小空间而定
+          ubuntu的默认策略是将这个核心文件丢给一个apport程序进行处理,存放在默认路径，需要设置一下 才能在当前文件下产生核心文件 
+          sudo sysctl -w kernel.core_pattern=./core.%e.%p # 设置coredump文件产生路径和名字
+
+    如何使用gdb调试coredump文件？ 
+    调试：
+        编译 g++ -g 
+        运行： gdb [可执行程序] [coredump 文件]
+    思路:
+        i.查看调用堆栈寻找崩溃原因   
+            bt            查看
+            f [堆栈编号] 切换到堆栈中去
+            p 输出变量  在崩溃的时候值
+
+        ii.根据崩溃点 查找代码 分析原因
+        iii. 修复bug
+*/
+/*
+    如何使用gdb调试多线程程序?
+    gdb 进入多线程程序
+    （gdb）l [文件名]:1,100 # 查看哪个文件 行范围内的源码
+    1.合适的位置设置断点 
+     (gdb) b [文件名]:20  # 在指定个文件多少行打断点
+     (gdb) n/c           # 单步/下一个断点处
+    i.查看线程信息 info thread  ii.t + 线程id进行切换 
+    strcpy(ptr,"my name is xiaofei");iii.切换到具体的某一层调用堆栈 bt 查看  f [堆栈号] 切换 p打印变量
+    2.调度器锁模式
+    i. 查看、设置调度期锁
+    show scheduler-locking
+    set sheduler-locking [off/on/step] 
+    不锁/ 只有当前线程可以运行 其他线程锁定/ 单步执行某一线程 保证当前线程不被切换 其他线程不执行
+    该模式下执行continue until finish命令其它线程也执行 遇到断点 切换断点线程为当前线程
+    ii.测试调度器锁为step模式
+*/
+```
+
+
+
+
+
 
 
 ## #内存对齐是什么？为什么需要考虑内存对齐？
@@ -1313,8 +1363,763 @@ RAII 在互斥锁上的作用：
 > 保证锁在提前 return / 抛出异常时被正确释放
 > 避免死锁
 
+## Lamda表达式
+
+Lambda表达式是C++11中引入的一种匿名函数特性，允许我们在代码中定义匿名的函数对象
+Lambda表达式的基本语法结构如下：
+[capture](parameters) -> return_type {
+  // function body
+}
+    capture: 捕获列表，定义了在Lambda表达式外部定义的变量在Lambda内部的可见性和使用方式。
+    // 捕获方式
+    值捕获: 通过值捕获外部变量，捕获时会对变量进行拷贝。
+    int x = 10;
+    auto lambda = [x] { return x; };
+    引用捕获: 通过引用捕获外部变量。
+    int x = 10;
+    auto lambda = [&x] { return x; };
+    隐式值捕获: 捕获所有外部变量（以值的方式）。
+    int x = 10;
+    auto lambda = [=] { return x; };
+    隐式引用
+    捕获: 捕获所有外部变量（以引用的方式）。
+    int x = 10;
+    auto lambda = [&] { return x; };
+    混合捕获: 同时使用值捕获和引用捕获
+    int x = 10, y = 20;
+    auto lambda = [x, &y] { return x + y; };
+    无捕获: 不捕获任何外部变量。auto lambda = [] { return 42; };
+
+    parameters: 参数列表，和普通函数的参数列表一样。
+    return_type: 返回类型，可以省略，编译器会自动推导。
+    function body: 函数体，包含Lambda表达式的代码逻辑。
+
 # 设计模式
 
-## #单例模式
+设计模式是解决软件设计中常见问题的可重用方案。它们提供了经过验证的解决方案，帮助开发者编写更优雅、可维护和可扩展的代码。
 
-## #适配器模式
+| 类型           | 数量  | 描述               | 难度 |
+| -------------- | ----- | ------------------ | ---- |
+| **创建型模式** | 5 种  | 关注对象的创建过程 | ⭐⭐   |
+| **结构型模式** | 7 种  | 处理类或对象的组合 | ⭐⭐⭐  |
+| **行为型模式** | 11 种 | 描述对象间的交互   | ⭐⭐⭐⭐ |
+
+- **单一职责原则 (SRP)** - 一个类应该只有一个职责
+- **开放封闭原则 (OCP)** - 对扩展开放，对修改关闭
+- **里氏替换原则 (LSP)** - 子类应该能够替换父类
+- **接口隔离原则 (ISP)** - 客户端不应该被迫依赖它们不使用的接口
+- **依赖倒置原则 (DIP)** - 依赖抽象，而不是具体实现
+
+- **组合复用原则** - 优先使用组合而不是继承
+- **迪米特法则** - 最少知识原则
+- **面向接口编程** - 而不是面向实现编程
+- **封装变化** - 将变化的部分封装起来
+
+
+
+## #单例模式 
+
+不管开发一个多大的系统，都会带一个日志功能；在实际开发过程中，会专门有一个日志模块，负责写日志，由于在系统的任何地方，我们都有可能要调用日志模块中的函数，进行写日志。那么，如何构造一个日志模块的实例呢？难道，每次new一个日志模块实例，写完日志，再delete，在C++中，可以构造一个日志模块的全局变量，那么在任何地方就都可以用了，不符合OOP ，全局变量是安全隐患，
+
+保证一个类只有一个实例，并提供一个访问它的全局访问点。首先，需要保证一个类只有一个实例；在类中，要构造一个实例，就必须调用类的构造函数，如此，为了防止在外部调用类的构造函数而构造实例，需要将构造函数的访问权限标记为protected或private；最后，需要提供要给全局访问点，就需要在类中定义静态类对象的指针 和 一个static函数，返回在类内部唯一构造的实例
+
+饿汉
+
+```c++
+class Singleton
+{
+public:
+    static Singleton *GetInstance()
+    {
+        if (m_Instance == NULL )
+        {
+            m_Instance = new Singleton ();
+        }
+        return m_Instance;
+    }
+    static void DestoryInstance()
+    {
+        if (m_Instance != NULL )
+        {
+            delete m_Instance;
+            m_Instance = NULL ;
+        }
+    }
+
+private:
+   Singleton(){
+   		m_Test = 10; 
+   }
+    static Singleton *m_Instance;
+};
+Singleton *Singleton ::m_Instance = new Singleton();
+```
+
+静态初始化在程序开始时，也就是进入主函数之前，完成了初始化，所以静态初始化实例保证了线程安全性。在性能要求比较高时，就可以使用这种方式，从而避免频繁的加锁和解锁造成的资源浪费。浪费内存，存在内存泄漏
+
+懒汉
+
+```c++
+class Singleton
+{
+public:
+    static Singleton *GetInstance()
+    {
+        if (m_Instance == NULL )
+        {
+            Lock(); 
+            if (m_Instance == NULL )
+            {
+                m_Instance = new Singleton ();
+            }
+            UnLock(); 
+        }
+        return m_Instance;
+    }
+    static void DestoryInstance()
+    {
+        if (m_Instance != NULL )
+        {
+            delete m_Instance;
+            m_Instance = NULL ;
+        }
+    }
+private:
+    Singleton(){
+   m_Test = 0; }
+    static Singleton *m_Instance;
+};
+
+Singleton *Singleton ::m_Instance = NULL;
+```
+
+使用的所谓的“双检锁”机制。因为进行一次加锁和解锁是需要付出对应的代价的，而进行两次判断，就可以避免多次加锁与解锁操作，同时也保证了线程安全。但是，这种实现方法在平时的项目开发中用的很好，也没有什么问题？但是，如果进行大数据的操作，加锁操作将成为一个性能的瓶颈；
+
+
+
+
+
+```c++
+static Singleton *GetInstance()
+    {
+        static Singleton m_Instance;
+        return &m_Instance;
+    }
+
+private:
+    Singleton(){};
+};
+int main(int argc , char *argv [])
+{
+    Singleton *singletonObj = Singleton ::GetInstance();
+    return ;
+}
+```
+
+static 类对象 改变生命周期，重复进入函数还是共享这一份，只在第一次的时候初始化，后面复用
+
+
+
+## #工厂模式
+
+| 模式     | 核心逻辑                                    | 适用场景                           | 优缺点                                             |
+| -------- | ------------------------------------------- | ---------------------------------- | -------------------------------------------------- |
+| 简单工厂 | 一个工厂类，通过标识创建不同产品            | 产品类型少、不常扩展               | 优点：简单；缺点：扩展产品需修改工厂类（违反开闭） |
+| 工厂方法 | 一个产品对应一个工厂（抽象工厂 + 具体工厂） | 产品类型多、需灵活扩展单个产品     | 优点：符合开闭；缺点：产品多则工厂类泛滥           |
+| 抽象工厂 | 一个工厂创建一组style相关产品（产品族）     | 需要创建配套产品、保证产品族一致性 | 优点：支持产品族扩展；缺点：产品等级扩展难         |
+
+
+
+<img src="E:\c++\resource\抽象工厂.png" style="zoom: 33%;" />
+
+# 数据采集和实时传输平台
+
+项目描述:
+
+​	面向在座舱环境中驾驶员穿戴多种传感器的场景，构建数据接入与实时传输中间层系统，承担多设备数据采集、时间对齐、缓冲、序列化与转发职责，具体的传感器设备包括眼动仪、脑电、动作捕捉、摄像头与音频设备。重点解决多源异构设备接入、并发采集、批量序列化、高吞吐可靠传输与系统稳定性的问题。
+
+## 
+
+## **先整体介绍一下这个项目。**
+
+业务背景是座舱实验场景下，驾驶员会同时穿戴和接入多种异构传感器，比如眼动仪、脑电、动作捕捉、摄像头、拾音器以及部分环境设备。不同设备底层 SDK、通信协议、数据频率和采集模式都不一样(具体)，
+
+眼动仪是厂商 SDK，很多能力通过回调给我，比如 gaze 数据回调、图像回调，属于比较典型的事件驱动模型。
+脑电这边接的是 LSL，更多是我主动去 `pull_sample`，属于拉模式。
+动捕这边是另一套 SDK，要先拿接口对象，再轮询事件，再从事件里取 avatar 和 joint 数据，更像轮询 + 解析事件模型。
+
+但上层希望把它们统一接入到同一套采集平台里，完成设备启动、实时采集、状态监测、数据转发和实时预览。这个系统在整条链路里的定位，是一个**采集与实时传输中间层**。向下屏蔽不同设备 SDK 和协议差异，向上传输数据。
+
+我主要负责三块。第一块是设备抽象与接入，包括 `SensorDevice` 抽象层、工厂创建、不同设备的初始化启动停止逻辑。第二块是高频数据链路，包括并发采集、缓冲队列、批量序列化、Kafka 发送和背压处理。第三块是旁路实时预览和控制协同，包括基于 Boost.Beast 的 WebSocket 推流，以及任务查询、状态上报这类控制面 WebSocket 通信
+
+## **系统整体架构**
+
+控制面主要是 MFC UI 和后端任务协同。MFC 主线程负责任务查询、设备勾选、初始化、开始停止采集、状态显示。任务查询、设备更新、采集状态上报这些控制请求通过同步 WebSocket 客户端和后端通信。
+
+主数据链路是传感器采集到 Kafka 的部分。数据流是：设备 SDK / 回调 / LSL / 轮询接口先产生原始数据，然后进入本地缓冲队列，再由独立的 sendLoop 线程批量出队、序列化，最后通过 Kafka producer 发给下游系统。Kafka 这条链路是完整性优先的主链路。
+
+旁路预览链路主要是眼图视频和音频预览。场景图像先进入一个小容量环形队列，后台线程一边用 FFmpeg 写 MP4，一边把场景帧编码成 JPEG，通过 Boost.Beast 实现的 WebSocket Server 广播给后端；音频侧把 PCM 数据直接通过 WebSocket 广播。这条链路是实时性优先，允许丢旧帧，不要求像 Kafka 那样完整保留。
+
+线程模型上，MFC UI 主线程只负责控制。采集侧按设备拆分，眼动是 SDK 回调驱动，脑电是独立拉流线程，动捕是独立轮询线程。消费侧每类设备有自己的 sendLoop。状态检测又有自己的 statusLoop。视频预览和写盘也有专门线程。所以整体是“采集线程/回调 + 队列 + 消费线程”的模型，主链路和旁路完全解耦。
+
+## 解决了什么问题 
+
+第一，异构设备统一接入；第二，高频数据采集与发送解耦，保证采集频率稳定；第三，Kafka 高吞吐可靠转发；第四，提供一个和主链路解耦的实时音视频预览能力。
+
+
+
+
+
+
+
+**设备抽象与接入**
+
+##  **为什么要抽象设备类**?
+
+​	项目接入的设备类型很多，眼动、脑电、动捕、Modbus 设备，它们底层 SDK 和通信方式完全不同，但从系统视角看，它们都要经历一套相似生命周期：初始化、连接、启动、停止、采集、状态查询等。所以我抽象了一个 `SensorDevice` 基类，把系统层面共同关注的能力统一成接口。这样上层 UI、任务调度、线程管理、状态监控都只依赖抽象，不依赖具体 SDK，实现了解耦。
+
+## 基类接口作用
+
+ `initialize` 负责设备加载配置、初始化资源；
+ `start` 负责启动内部线程或注册回调；
+ `stop` 负责释放运行态资源，停设备的sdk数据流 ，等待消费线程的join，flush kafka的本地对列；
+ `getData` 是持续采集的主入口，轮询获取数据的接口；
+ `getStatus` 给外部监控模块统一拿状态，状态线程  
+在回调和轮询中  更新最新一次获取数据的时间，每隔5s 再获取一次最新更新数据时间，比较前后时间是否一样来反馈设备数据是不是断掉了
+
+每个设备都必须具备且实现差异很大的，所以设计成纯虚函数,    
+
+##  **新增一个新设备时，你的接入流程是什么？**
+
+新增一个新设备时，接入流程一般是：先实现一个继承自 `SensorDevice` 的具体类，把该设备的 SDK 初始化、启动、采集和停止逻辑封装进去；然后在工厂里注册这个设备类型；最后在 通过一个字符串标识去实例化设备。这样整个系统的上层逻辑基本不用改。
+
+## 工厂模式
+
+我当前落地的是**简单工厂**，不是严格意义上的经典工厂方法。上层通过一个字符串标识去工厂拿 `SensorDevice*`，工厂内部通过字符串标识决定实例化 `aSeeGalsses`、`Mocap`、`Electroencephalogram` 或 `ModbusSensorDevice`。这么做的目的，让上层只依赖抽象类。后续如果设备种类继续增加，我会把它升级成注册式工厂，用 `unordered_map<string, Creator>` 管理构造器，并把裸指针改成 `unique_ptr<SensorDevice>`，进一步降低耦合和泄漏风险。
+
+## 单例模式
+
+这里主要是kafka的producer对象 需要重复使用，确保全局唯一，消费线程 创建出来要用，停止采集的时候要flush producer里的数据
+
+
+
+
+
+
+
+##  **设备对象的生命周期**
+
+当前设备对象的生命周期是由上层 UI/调度层管理的。开始采集时，通过工厂创建具体设备对象，保存为成员指针；停止采集时，由外部统一调用 `stop`，最后 delete。也就是说它是**外部托管型生命周期**，设备对象本身不自行销毁。
+
+##  **start / stop 幂等性**
+
+`start / stop` 幂等性我会从两层保证。第一层是 UI 层，开始后禁用“开始”按钮，避免用户重复点击。第二层是设备内部的原子状态保护。基础版可以用 `atomic<bool> running_` 配合 CAS，保证只有第一个 `start` 能把状态从 false 切到 true，只有第一个 `stop` 能把状态从 true 切到 false。
+
+更完整的做法是显式状态机，比如 `Idle -> Starting -> Running -> Stopping -> Idle`，这样可以更好地区分“正在启动”和“已经启动”、“正在停止”和“已经停止”。
+
+如果用户连续点两次开始采集，第一层 UI 就会先拦住；即便没拦住，内部 CAS 也会保证只有第一次真正启动线程和资源，第二次直接返回“已启动”。
+
+如果 `start` 到一半失败，比如线程起起来了但某个资源打开失败，已经创建的线程和资源要逆序释放，把状态回滚，避免进入“半启动”状态。
+
+
+
+
+
+## 针对不同传感器采用不同并发模型
+
+多生产者、还是单生产者
+
+## SPSC lock-free ringbuffer
+
+```c++
+#pragma once
+#include <iostream>
+#include <array>
+#include <atomic>
+#include <utility> // 支持std::move
+template<class T,std::size_t N>
+
+class SpscRingQueue{
+    static_assert(N & (N - 1)==0,"N must be power of two");
+public:
+    SpscRingQueue(const SpscRingQueue&) = delete;
+    SpscRingQueue& operator=(const SpscRingQueue&) = delete;
+    SpscRingQueue(SpscRingQueue&& ) = delete;
+    SpscRingQueue& operator=(SpscRingQueue&&) = delete;
+    // memory order 
+    // 编译器和cpu为了优化性能，可能做指令重排/延迟传播到其他核心 ，单线程语义不受影响，多线程环境下，可能出现其他线程观察到的执行顺序和源码顺序不一致
+    // 比如SPSC中 生产者先加入数据，再移动指针，消费者可能观察到指针已经更新了，数据没有更新，结果拿到的数据不是最新数据，因此需要使用内存序来对多线程环境下对共享内存的重排/可见性做约束
+    // atomic<T>.load/story 里 relaxed 不做任何约束     release-acquire 其他线程可见顺序上，保证release之前的读写在acquire后都可见，且release 不会重排到之前读写操作的前面，acquire不会重排到之后读写操作的后面
+    bool Push(T& val) {
+        size_t t = tail_.load(std::memory_order_relaxed);
+        size_t next = (t + 1) & mask_;
+        if(next == head_.load(std::memory_order_acquire)) {
+            return false;
+        }
+        buffer_[t] = val;
+        tail_.store(next,std::memory_order_release);
+        return true;
+    }
+    bool Push(T&& val) {
+        size_t t = tail_.load(std::memory_order_relaxed);
+        size_t next = (t + 1) & mask_;
+        if(next == head_.load(std::memory_order_acquire)) {
+            return false;
+        }
+        buffer_[t] = std::move(val);
+        tail_.store(next,std::memory_order_release);
+        return true;
+    }
+
+    bool Pop(T* out) {
+        if(out == nullptr) return false;
+        size_t h = head_.load(std::memory_order_relaxed);
+        if(h == tail_.load(std::memory_order_acquire)) return false;
+        *out = buffer_[h];
+        head_.store((h + 1)  & mask_,std::memory_order_release);
+        return true;
+    }
+
+    bool empty() {
+        return tail_.load(std::memory_order_acquire) == head_.load(std::memory_order_acquire);
+    }
+
+    size_t size() {
+        size_t h = head_.load(std::memory_order_acquire);
+        size_t t = tail_.load(std::memory_order_acquire);
+        return (t - h) & mask_;
+    }
+
+
+private:
+    static constexpr size_t mask_ = N - 1;               // static constexpr 编译期常量    相比模运算 位运算更快
+    alignas(64) std::array<T,N> buffer_{};               // alignas(64) 防止伪共享 这些变量进入不同的cacheline
+    alignas(64) std::atomic<size_t> head_ = 0;            
+    alignas(64) std::atomic<size_t> tail_ = 0;
+};
+
+```
+
+
+
+## MPSC 多生产单消费ConcurrentQueue
+
+ConcurrentQueue是一个高性能的、线程安全的并发队列库。它旨在提供高效、无锁的数据结构，适用于多线程环境中的数据交换。concurrentqueue 支持多个生产者和多个消费者，并且提供了多种配置选项来 优化 性能和内存使用。
+
+我项目里用 ConcurrentQueue，核心原因是它和我的并发模型匹配：采集侧是多生产者，发送侧通常是单消费者，而且数据频率高，锁竞争会比较敏感。它本身是一个高性能的 lock-free MPMC 队列，支持 token 和 bulk dequeue，适合把高频小对象先快速入队，再由消费线程批量取出做序列化和 Kafka 发送。需要注意的是，它不是线性化队列，不保证多生产者之间的全局顺序，所以业务顺序不能依赖它，而要依赖时间戳或序号。因为它本身是非阻塞的，所以我会额外配事件通知来避免消费者空转，并在业务层做容量上限和丢弃策略，防止无界增长。
+
+
+
+
+1.`moodycamel::ConcurrentQueue` 中的 `token`（令牌），为每个线程分配专属的访问凭证，队列会为持有 token 的线程缓存局部状态（比如可用的内存块、队列分段信息）；避免多个线程争抢同一个全局原子变量，将竞争分散到线程本地，大幅提升高并发下的入队 / 出队效率。
+
+2.多生产者下顺序能保证吗？多生产者并发入队无法保证全局严格时间顺序（取决于线程调度），只能保证“入队发生的先后关系”。但通常能保证单生产者内部的相对顺序（同一线程 enqueue 的顺序）。数据有时间戳，消费端重对齐
+
+3.事件通知 + notified CAS：会不会漏唤醒？`notified` 是边沿触发：空→非空只唤醒一次，避免 2000/s 每条都进内核。consumer 在 确认队列空时复位 `notified=false` 再 Wait，降低漏唤醒概率。auto-reset 适合单消费者一次 SetEvent 唤醒一次，自动复位，避免手动 ResetEvent 出错。
+
+##  **为什么要引入无锁队列**
+
+在高频场景下，大量入队会产生锁竞争和抖动。无锁队列更适合做高频、短路径的数据交换，尤其当后面还要批量时，无锁队列的吞吐和延迟 性能更优。
+
+##  **无锁队列之外为什么还要事件通知？**
+
+无锁队列之外还要事件通知，是因为队列只解决“并发交换数据”，不解决“消费者空的时候怎么睡”。如果消费者不断 `try_dequeue`，队列空时会忙轮询，CPU 占用很高。所以我会让消费者在空队列时阻塞等待，由生产者在“从空到非空”的边沿上触发一次唤醒，这样既避免空转，又不会让高频 producer 每次都产生内核切换。
+
+##  **为什么不用 condition_variable？**
+
+`condition_variable` 更适合“mutex + 有锁队列”的模型。如果数据通道已经是 lock-free queue，再为了等待引入一把 mutex，会让设计风格不统一，而且等待路径又回到了锁模型。我更倾向让无锁队列负责数据交换，event 只负责睡眠/唤醒，两者。
+
+##  **为什么事件通知用边沿唤醒？**
+
+边沿唤醒是为了避免高频 producer 重复唤醒消费者。通过一个 `notified_` 原子位，只在“未通知 -> 已通知”这个边沿上由 CAS 成功的那个 producer 触发 `SetEvent`，这样就不会每次 enqueue 都打一次门铃。
+
+##  **怎么避免漏唤醒？**
+
+避免漏唤醒的关键，是消费者不能简单地“先判空再睡”，而是要在真正准备睡前做双检。也就是先批量 dequeue，真的没拿到数据才把 `notified_` 复位，再检查一次队列，确认还是空才 `Wait`。这样可以尽量消除“队列里已有数据但线程睡过去”的竞态窗口。
+
+##  **单消费者，为什么选 auto-reset event？**
+
+只需要一次 `SetEvent` 唤醒一个消费者线程即可，唤醒后由内核自动复位，正好匹配边沿通知模型。manual-reset 更适合广播唤醒或状态门闩，不适合这里。
+
+队列与背压
+
+ 
+
+## 完整性优先，实时性优先**
+
+Kafka 主链路是完整性优先，所以眼动、脑电、动捕这些数据在进入 sendLoop 之前，都会先进入主缓冲队列。这个队列的职责是削峰和解耦，让采集线程和发送线程速度不一致时不直接互相阻塞。主链路上我不希望随便丢数据，所以策略通常是批量消费、背压联动、必要时落盘
+
+预览链路是实时性优先。像视频场景帧，我用了一个很小的固定容量环形队列，满了直接覆盖最旧帧。原因是预览链路的业务目标是让后端看到“当前状态”，不是保证每一帧都完整到达。如果处理慢或网络慢，不丢旧帧的话，延迟只会越来越大，最后看到的是几秒前的旧画面，这比跳帧更糟。
+
+##  **Kafka队列 **
+
+
+
+
+
+
+
+调参数    增加吞吐
+
+## 本地主链路队列满了
+
+必要时落盘，尝试写入主链路队列失败，把这条数据丢入写磁盘的缓冲区，批量(batch、ms )写入，【后台线程 从磁盘中补发数据到kafka的本地队列里
+
+## 监控队列积压
+
+积压监控方面，我会看几个指标：本地队列长度或 inflight 计数、Kafka producer 的 `outq_len`、`queue_full` 次数、序列化耗时、batch 耗时，以及 delivered 成功/失败计数。这样能判断积压到底发生在哪一层。
+
+序列化
+
+##  **序列化优化** 
+
+序列化这一层之所以要优化，是因为在高频链路里，它很容易成为消费端的 CPU 瓶颈。尤其是如果逐条对象转 JSON、逐条发 Kafka，固定开销会很大，一旦消费速度跟不上，队列就会积压。 优化方式   批处理 + 使用更高效的第三方库
+
+**采集线程只做轻量工作，序列化下沉到消费线程**。采集线程只负责拿数据、填充结构体、打时间戳、入队；sendLoop 批量出队后再统一做序列化和 Kafka 发送。这样可以避免采集线程被字符串拼接、时间格式化、JSON 对象构造拖慢，保证采集频率稳定，同时也便于做 batch serialize。
+
+## nlohmann::json，RapidJSON？ 
+
+之所以从 nlohmann::json 换到 RapidJSON，本质上是因为模型不同。nlohmann::json 更偏 DOM 构建，通常要先构造 JSON 树，再 dump 成字符串，中间会有很多小对象和动态分配；RapidJSON 的 `Writer + StringBuffer` 是流式写入，可以直接把字段写进连续 buffer，不需要先构造一棵完整 DOM。再配合 `Reserve` 和 buffer 复用，分配次数和拷贝都会少很多。考虑 protobuf  这类二进制格式。 长度更短，没有冗余字符，解析更快 
+
+ 
+
+## Kafka 发送
+
+Kafka 在这个项目里承担的是主数据总线角色。它接住采集端出来的标准化数据流，供后续多个下游系统消费，比如存储、分析、监控或实时处理。它的核心价值不只是“异步”，还包括高吞吐、多消费组独立订阅、消息保留和回放能力。
+
+## Kafka核心架构
+
+Kafka的核心架构组件包括：
+
+Producer（生产者）：发布消息到指定Topic，支持分区策略和消息确认机制（如acks配置）。
+Broker（代理）：Kafka集群节点，负责消息存储、处理读写请求，并参与副本复制和故障转移。
+Consumer（消费者）：订阅Topic并消费消息，支持消费者组实现负载均衡。
+Topic（主题）：消息的逻辑分类，生产者发送消息到Topic，消费者订阅Topic。
+Partition（分区）：Topic的物理划分，提高并行处理能力，保证分区内消息顺序。
+Replica（副本）：分区的副本（包括Leader和Follower），确保数据冗余和一致性。
+Zookeeper（协调器）：管理集群元数据（如Broker、Topic信息），协调消费者组偏移量提交和分区分配（Kafka 2.8.0+支持KRaft模式替代Zookeeper）
+
+## RabbitMQ 或 RocketMQ？
+
+选 Kafka 而不是 RabbitMQ 或 RocketMQ，主要是因为我的场景更像高吞吐事件流和采集流。我们更看重吞吐量、可回放、多下游独立消费和流式处理能力，而不是复杂业务路由或特定业务消息语义。RabbitMQ 更适合业务队列，RocketMQ 在延迟消息、事务消息上也很强，但从这个项目的采集型数据链路看，Kafka 更匹配
+
+##  **producer 的发送模型是怎样的？**
+
+producer 发送模型上，我是批量序列化后异步 `produce`。生产线程不直接发 Kafka，而是 sendLoop 线程 batch 出队、batch serialize，再发 producer。批量发送的原因是减少每条消息固定开销，提高吞吐，并让 broker 侧 batching 更有效。
+
+##  **你配置上主要调了哪些参数来兼顾吞吐和可靠性？**
+
+配置策略上，主要是吞吐和可靠性的平衡。
+
+吞吐侧我会关注 batch、linger、压缩、内部队列大小；
+
+可靠性侧会关注 `acks`、重试、幂等、超时配置。
+
+
+
+##  **acks 怎么选？**
+
+acks = all 同时开启了幂等
+
+
+
+acks参数控制生产者发送消息的确认机制，也就是控制生产者发送消息，Broker端确认成功写入的条件
+
+消息写入kafka 过程:
+
+对于某个topic-partition 
+
+1.生产者将消息发给该分区的leader broker
+
+2.leader broker将消息追加本地日志 更新内存/页缓存（不等磁盘fsync
+
+3.leader把数据复制给follower
+
+4.follower 复制完成后返回leader
+
+5.leader根据acks规则决定什么时候返回生产者 suc/fal
+
+acks = 0   生产者不等任何broker响应，发出去就当成功
+
+acks = 1   leader写入本地日志后就返回成功，不等follower复制
+
+（**已 ack 仍可能丢**：如果 leader 写入后立刻宕机，而 follower 还没复制到，这条消息可能不在新 leader 上 → 丢失）
+
+acks = all    leader需要等待ISR集合里所有的副本都确认写入才返回成功
+
+（ISR是与leader同步的一组副本集合，如果落后太多会被踢出）
+
+（min.insync.replicas 指的是ISR中至少的副本数量，ack =all 时候，min.insync.replicas > 1,这样至少两个副本写成功才ack，leader宕机不丢）
+
+
+
+使用librdkafka 异步 producer，`produce()` 只代表进入客户端队列，为了确认 broker 端是否按 acks 语义确认写入，我注册了 Delivery Report 回调并在消费线程里持续 `poll()` 驱动回调执行。运行过程中我统计 `produced_ok / delivered_ok / delivered_fail`，并监控 `outq_len` 和 `QUEUE_FULL` 次数衡量背压。退出时 `flush()` 并输出最终投递成功率和失败原因日志，因此可以用数据证明消息真实投递情况，而不是只停留在“入队成功”。
+
+`acks=all` 只能保证 broker 端在 ISR 副本确认后才返回成功，但仍可能因为 producer 崩溃导致消息没发出去，我会用 delivery report 确认最终投递结果，并配合 replication.factor>=3、min.insync.replicas>=2 来避免“假成功”。对关键数据进一步用本地 WAL 做兜底，失败时可阻塞重试，超过最大次数 降级落盘。
+
+
+
+
+
+
+
+
+
+
+
+##  **有没有开幂等？**
+
+幂等我在概念上是清楚的：如果要避免 producer 重试导致重复写，可以启用 `enable.idempotence=true`。
+
+`max.in.flight.requests.per.connection``5`单个连接同时发送的未确认请求数开启幂等性时最大只能设为 5，设为 1 可保证消息顺序，但吞吐会显著降低
+
+Producer 给每条消息流打身份和序号，Broker 按这个身份和序号做去重与乱序保护。
+
+##  **怎么处理 `ERR__QUEUE_FULL`？**
+
+`ERR__QUEUE_FULL` 是 Kafka 背压的重要信号。处理方式不是瞎重试，而是 `poll + backoff`。因为 `produce()` 只是把消息放进 producer 内部队列，真正把 outq drain 掉、处理 delivery report，需要靠 `poll()` 驱动。如果队列满了你不 poll，它可能一直满。所以我会在 `queue_full` 时统计指标、调整参数、poll、短暂退避，  必要时  做落盘。
+
+##  **为什么 producer 要 poll？**
+
+producer 要 poll，核心原因就是它是异步 IO，很多回调和内部状态推进都靠 poll 驱动。
+
+##  **为什么 stop 的时候要 flush？**
+
+stop 的时候要 flush，是为了在退出前尽量把 producer 里还没真正送达 broker 的消息发出去，做一个可靠性收口。它不是绝对不丢的数学保证，但能显著减少退出瞬间丢最后一批消息的概率。
+
+##  **at-most-once、at-least-once 还是 exactly-once？**
+
+| 投递语义                  | 核心定义                                                     | 你的代码是否满足                                             |
+| ------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| at-most-once（最多一次）  | 消息可能丢失，但绝不会重复；生产者发送后不等待确认，直接认为成功 | ❌ 不满足：你配置了 dr_cb（投递回调），且未关闭重试，不会主动丢弃消息 |
+| at-least-once（至少一次） | 消息绝不会丢失，但可能重复；生产者发送失败会重试，直到收到成功确认 | ✅ 满足（基础）：1. 未关闭 Kafka 生产者的默认重试（retries 默认值通常 >0）；2. 配置了 dr_cb 可感知投递失败，业务侧可基于回调重试；3. acks 因 `enable.idempotence=true` 被自动设为 `all`（所有副本确认），进一步降低丢失概率 |
+| exactly-once（精确一次）  | 消息既不丢失，也不重复；是 at-least-once + 去重 / 幂等的组合 | ✅ 具备核心条件，但需补充验证：1. 代码中显式配置 `enable.idempotence=true`（开启生产者幂等性）—— 这是 exactly-once 的核心配置，Kafka 会通过 producer id + sequence number 保证单生产者向单分区发送的消息不重复；2. 配套配置 `max.in.flight.requests.per.connection=5`（幂等性要求 ≤5），符合规则；⚠️ 注意：仅开启幂等性是「单生产者 - 单分区」的 exactly-once，若要跨生产者 / 跨分区的全局 exactly-once，还需开启事务（transaction），你的代码中未配置事务，因此仅能保证单生产者单分区的精确一次。 |
+
+
+
+分区与顺序
+
+##  **你 Kafka topic 怎么设计的？**
+
+##  **分区是怎么考虑的？**
+
+按 topic 先做数据类型隔离，partition 层面由 Kafka 默认分区器处理；也就是说，发送时没有显式指定分区，也没有自己实现自定义 partitioner。
+
+partition 主要承担两件事：
+
+第一，提供吞吐扩展能力。
+ 如果某个 topic 后续流量继续上涨，可以通过增加 partition，把 broker 侧写入和 consumer 侧消费并行度提上去。
+
+第二，提供消费并发上限。
+ 一个 consumer group 内，一个 partition 同时只能被一个 consumer 实例消费，所以 partition 数量直接决定了消费并行度上限。
+
+当前我更关注 topic 级隔离；partition 在现阶段更多是为吞吐扩展和后续消费并行预留能力。
+
+##  **消息顺序性怎么保证？**       
+
+我当前的主语义依赖的是设备自身采集时间戳和后续对齐逻辑，而不是依赖 Kafka partition 做全局顺序控制。
+
+##  **如果同一个设备的数据必须按顺序消费，你怎么做？**
+
+把设备级标识，比如 `deviceId`，作为 Kafka message key 传进去。这样同一个 `deviceId` 经过默认哈希分区后，会稳定落到同一个 partition，上游 producer 就能把“同设备顺序”映射成“同 partition 顺序”。
+
+
+
+##  **如果多个下游同时消费同一个 topic，互相会不会影响？**
+
+如果多个下游同时消费同一个 topic，只要它们是不同 consumer group，就互不影响。每个 group 自己维护自己的 offset，一个组失败不会影响另一个组。这也是 Kafka 很适合“一份采集数据同时写多个系统”的原因。
+
+
+
+### **WebSocket 实时推流**
+
+
+
+![image-20260311195429591](E:\c++\resource\image-websockt_stream.png)
+
+**服务端**：`WsSensorServer` 监听端口，为每个新连接创建 `WsSession`；`WsHub` 作为单例管理器，统一广播音视频数据给所有在线 `WsSession`。
+
+**客户端**：`WsSensorClient` 主动连接服务端，支持发送文本 / 二进制数据，维持长连接并处理读写。
+
+**核心设计**：所有写操作串行化（避免数据错乱）、异步 I/O（非阻塞）、线程安全（互斥锁保护队列）。 
+
+
+
+### **WebSocket 推流旁路？**
+
+ **为什么不用 RTSP / WebRTC / HLS？**
+
+做这条 WebSocket 旁路，是为了实时预览。Kafka 主链路解决的是可靠转发和下游消费，但不适合做低延迟直接预览。所以我额外起了一个轻量 WebSocket Server，把视频和音频推给后端或前端用于实时查看。
+
+为什么不用 RTSP / WebRTC / HLS？因为当前目标不是做标准直播平台，而是做内网轻量预览。WebSocket 接入简单、后端容易消费、实现成本低。RTSP/WebRTC 都更重，尤其 WebRTC 的 NAT、ICE、STUN/TURN 这些对当前场景来说没必要。
+
+##  **你推送的视频和音频是什么格式？**
+
+我当前推的视频是 JPEG，音频是 PCM，不是 H264/AAC。视频先在本地用 FFmpeg 写 MP4，同时把场景帧编码成 JPEG 推送；h264  【优先独显、cpu核显、cpu软编】，音频是波形采集后的 PCM 小块数据。之所以这样选，是因为预览链路优先考虑低实现成本和低耦合，JPEG/PCM 解码简单，后端接入快。代价我也清楚，就是带宽不够友好，所以这条链路适合内网预览，不适合大规模公网分发。
+
+封包协议很轻量，核心是 `[type + ts + payload]`。第一个字节表示类型，场景图和 PCM 用不同通道标识；后面 8 字节是时间戳；再后面是 JPEG 或 PCM 的原始 payload。这样前后端拿到包之后，就能按 type 区分音频和视频，按 ts 做简单同步。
+
+
+
+##  **多客户端的时候会不会互相影响？**
+
+多客户端不会互相影响，因为每个连接对应一个 `WsSession`，session 内部有自己的发送队列和 `writing_` 状态。Hub 只是做广播分发，真正发送由每个 session 自己控制。慢客户端只会拖自己的队列，不会阻塞别的客户端和采集线程。
+
+
+
+##  **为什么 Beast 里写操作要串行化？**
+
+
+
+多个线程来源会并发地往同一个 WebSocket session 发消息。具体数据有两类：一类是视频场景帧编码后的 JPEG 二进制数据，另一类是音频采集得到的 PCM 二进制数据。它们都会被封装成统一的二进制消息格式 `[type + timestamp + payload]`，最终进入同一个 `WsSession` 的发送队列。
+
+Beast 基于 Asio 的 socket 实现网络读写，而 **操作系统的 socket 写接口（如 `write()`/`send()`）本身不是线程安全的**：
+
+- 如果多个线程同时调用 socket 的写操作，会导致数据「交错写入」（比如线程 A 写 "hello"、线程 B 写 "world"，最终可能写出 "hweolrllod" 这类乱序数据）；
+- 甚至会触发底层缓冲区竞争，导致写操作返回错误、数据丢失或程序崩溃。
+
+Beast 作为上层封装，必须规避这个底层限制，因此通过「串行化」确保同一时刻只有一个写操作作用于 socket。
+
+`pushScene()` 和 `pushPcm()` 都不会直接写 socket
+
+它们只是把封好的二进制 buffer `shared_ptr<vector<uint8_t>>` 入队
+
+然后通过 `flush()` 串行触发 `async_write`
+
+上一个 write 完成后，在 `on_write()` 里再发下一个
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+可观测性与异常检测
+
+##  你怎么判断一个设备在线还是离线？
+
+** 为什么不是简单看线程活着就算在线？你记录了哪些指标？**
+
+设备在线状态我不是看“线程活着没有”，而是看“最近是否还有有效数据进来”。每个设备都会在采集线程或回调里更新一个 `lastTimestamp_`，状态线程周期性读取这个时间戳。如果它持续更新，说明数据流正常，设备在线；如果一段时间都不变，就说明线程虽然可能没崩，但设备已经不产出数据了，这时判定为离线。
+
+不能简单看线程活着就算在线，是因为线程可能还在轮询、SDK 回调线程也还存在，但设备实际已经断开，不再出数据。这时候真正的判据应该是“数据流是否还在更新”。
+
+
+
+量化结果追问**
+ **你写了“吞吐峰值约 3 万条/秒；采集线程进入 Kafka 本地队列平均延迟 ≤ 5 ms”，这个指标怎么测的？**
+ **是在什么压力模型下测出来的？**
+ **3 万条/秒是哪些设备一起跑出来的?**
+ **瓶颈主要在哪一层？**
+
+ 如果让我把吞吐再翻倍，你第一步会优化哪里？**
+
+
+
+优化序列化，考虑二进制协议替代 JSON。
+
+考虑 Kafka 侧吞吐性参数 调整  batch、linger、分区数和下游消费能力。
+
+
+
+
+
+
+
+稳定性与边界场景
+ 如果设备在采集中途断开会怎样？
+ 如果 Kafka broker 短时不可用呢？
+ 如果 stop 时某个线程还没退出怎么办？
+ 如果一个设备初始化成功，另一个失败了，整个系统怎么处理？
+ 你这套设计里现在最大的不稳定点是什么？
+
+最后会追一个“反思题”
+ 这个项目如果你现在回头重构，最想改的三件事是什么？
+ 当前设计里你最不满意的地方是什么？
+ 如果以后要把这个系统做成产品级，而不是项目级 Demo，你最先补哪几块？
+
+
+
+把设备生命周期收敛成统一状态机。把设备生命周期收敛成统一状态机。
+
+把高频链路的缓冲与背压做得更体系化
+
+protobuf 代替 json 
+
+
+
+
+
+## ROS2自主导航机器人
+
+## DDS
+
+**面向分布式系统的发布-订阅通信中间件标准**。它的核心作用就是：
+
+- 让不同进程、不同机器上的程序彼此发现
+- 按“发布者-订阅者”方式传数据
+- 并且能控制通信质量，比如可靠性、延迟、历史消息保留等
+
+## ROS2用的什么DDS
+
+## DDS通信的Qos有了解吗
+
+ROS2 里的 QoS 本质上是通信质量策略，用来控制消息怎么发、怎么存、丢了怎么办、晚来的订阅者能不能拿到历史数据。
+
+ Reliability
+
+> reliability 分为 reliable 和 best effort。
+>  reliable 更强调消息尽量可靠送达，适合控制命令、关键状态；
+>  best effort 允许丢包，适合高频传感器流，比如图像、激光雷达这类“宁可丢一点也别卡住”的数据。ROS2 官方 QoS 文档和丢包网络示例都强调了这种差别。
+
+## ROS1 和 ROS2 的区别？
+
+第一，通信架构不同
+
+> ROS1 更依赖中心化的 ROS Master 做节点发现；
+>  ROS2 底层基于 DDS，支持分布式发现，不再是 ROS1 那种强中心化风格。ROS2 官方关于中间件 vendor 的说明和基础概念页都体现了这一点。
+
+第二，QoS 和工程能力更强
+
+> ROS2 支持 QoS 策略，可根据不同场景控制可靠性、持久性、历史缓存等，更适合真实机器人和工业场景；ROS1 这块能力弱很多。
+
+第三，更适合分布式和实时场景
+
+> ROS2 从设计目标上就更强调实时性、可靠性、安全性和多机部署。官方还有专门的安全文档，说明 ROS2 可以在 DDS-Security 之上工作。
+
+第四，launch、参数、接口组织方式也有变化
+
+> 比如 ROS2 的 launch 不只支持 XML，也支持 Python、YAML，灵活性更高；参数文件格式也和 ROS1 有差别。官方迁移文档有专门说明。
+
+## 节点、话题、服务关系
+
+**节点（Node）** 是最小运行单元，负责具体功能；
+ **话题（Topic）** 是节点之间做异步发布/订阅通信的通道；
+ **服务（Service）** 是节点之间做同步请求/响应通信的方式。
+
+> Topic 适合持续流式数据，比如里程计、激光、图像、状态信息，因为发布方和订阅方是解耦的，可以一对多。
+
+> Service 适合一次触发、一次返回的操作，比如“开始播报”“查询状态”“重置模块”。
+>  它更强调请求-响应，而不是持续数据流。
+
+## 怎么实现导航的
+
+> 我先用 URDF/Xacro 描述机器人本体，包括底盘、轮子、传感器挂载关系，让机器人能在 Rviz 和 Gazebo 里正确显示和参与仿真。
+
+> 然后在 Gazebo 里加载仿真环境，让机器人具备运动和传感器仿真的基础条件。
+
+> Navigation2 负责导航核心能力，包括定位、路径规划、局部控制和最终把机器人移动到目标点。
+>  我在项目里主要是站在使用者角度调用它，而不是改它内部算法。
+
+> 我写了一个巡航节点，预设一组巡检目标点，按顺序给导航模块发送目标位姿。
+>  当一个目标完成后，再下发下一个目标。
+
+> 机器人到达指定点位后，巡航节点再调用语音播报服务，实现“移动到点 + 业务播报”的联动。

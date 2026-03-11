@@ -48,4 +48,4 @@ enable.idempotence=true  acks=all 幂等producer会给每个分区的消息带�
 
 使用librdkafka 异步 producer，`produce()` 只代表进入客户端队列，为了确认 broker 端是否按 acks 语义确认写入，我注册了 Delivery Report 回调并在发送线程里持续 `poll()` 驱动回调执行。运行过程中我统计 `produced_ok / delivered_ok / delivered_fail`，并监控 `outq_len` 和 `QUEUE_FULL` 次数衡量背压。退出时 `flush()` 并输出最终投递成功率和失败原因日志，因此可以用数据证明消息真实投递情况，而不是只停留在“入队成功”。
 
-`acks=all` 只能保证 broker 端在 ISR 副本确认后才返回成功，但仍可能因为 producer 崩溃导致消息没发出去，或者因为 min.insync.replicas 配置过低导致只剩 leader 也会 ack。我们会用 delivery report 确认最终投递结果，并配合 replication.factor>=3、min.insync.replicas>=2 来避免“假成功”。对关键数据进一步用本地 WAL 做兜底，失败时可阻塞重试或降级落盘。
+`acks=all` 只能保证 broker 端在 ISR 副本确认后才返回成功，但仍可能因为 producer 崩溃导致消息没发出去，或者因为 min.insync.replicas 配置过低导致只剩 leader 也会 ack。我们会用 delivery report 确认最终投递结果，并配合 replication.factor>=3、min.insync.replicas>=2 来避免“假成功”。失败时可阻塞重试，达最大次数后降级落盘。
